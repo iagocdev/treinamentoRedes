@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Treinamento Interativo</title>
+  <style>
+    body {
+      background-color: black;
+      color: #00FF00;
+      font-family: 'Courier New', Courier, monospace;
+      margin: 0;
+      padding: 10px;
+    }
+    #menu, #terminalSection, #quizSection {
+      display: none;
+    }
+    #menu {
+      display: block;
+      text-align: center;
+      margin-top: 100px;
+    }
+    button {
+      background-color: black;
+      border: 2px solid #00FF00;
+      color: #00FF00;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      padding: 15px 30px;
+      margin: 20px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #00FF00;
+      color: black;
+    }
+    #terminalHelp {
+      margin-bottom: 15px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #terminalOutput {
+      white-space: pre-wrap;
+      line-height: 1.4;
+      margin-bottom: 10px;
+      height: 400px;
+      overflow-y: auto;
+      border: 1px solid #00FF00;
+      padding: 10px;
+    }
+    #cmdInput {
+      background-color: black;
+      color: #00FF00;
+      border: none;
+      border-bottom: 1px solid #00FF00;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      width: 100%;
+      outline: none;
+    }
+    span {
+      color: #00FF00;
+    }
+    #quizQuestion {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    #quizOptions label {
+      display: block;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+    #quizOptions input {
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    #quizControls {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="menu">
+    <h1>Treinamento Interativo</h1>
+    <button id="btnTerminal">Terminal Interativo</button>
+    <button id="btnQuiz">Quiz de Perguntas</button>
+  </div>
+
+  <div id="terminalSection">
+    <button id="btnBackTerminal">← Voltar ao Menu</button>
+    <div id="terminalHelp">
+      <strong>Como usar o Terminal Interativo:</strong><br>
+      - Teste a conectividade com: <code>ping 8.8.8.8</code><br>
+      - Veja configurações básicas: <code>ipconfig</code><br>
+      - Veja configurações completas: <code>ipconfig /all</code><br>
+      - Rastreie rota até um host: <code>tracert google.com</code><br>
+      - Consulte DNS: <code>nslookup google.com</code><br>
+      - Veja conexões ativas: <code>netstat</code><br>
+      - Limpe a tela: <code>cls</code><br>
+      - Veja ajuda: <code>help</code>
+    </div>
+    <div id="terminalOutput"></div>
+    <input type="text" id="cmdInput" autofocus autocomplete="off" />
+  </div>
+
+  <div id="quizSection">
+    <button id="btnBackQuiz">← Voltar ao Menu</button>
+    <div id="quizQuestion"></div>
+    <form id="quizOptions"></form>
+    <div id="quizControls">
+      <button id="btnSubmitAnswer" disabled>Responder</button>
+      <button id="btnNextQuestion" style="display:none;">Próxima</button>
+    </div>
+    <div id="quizResult" style="margin-top:20px;"></div>
+  </div>
+
+  <script>
+    // Menu buttons
+    const menu = document.getElementById('menu');
+    const terminalSection = document.getElementById('terminalSection');
+    const quizSection = document.getElementById('quizSection');
+
+    const btnTerminal = document.getElementById('btnTerminal');
+    const btnQuiz = document.getElementById('btnQuiz');
+    const btnBackTerminal = document.getElementById('btnBackTerminal');
+    const btnBackQuiz = document.getElementById('btnBackQuiz');
+
+    btnTerminal.onclick = () => {
+      menu.style.display = 'none';
+      terminalSection.style.display = 'block';
+      document.getElementById('cmdInput').focus();
+    }
+    btnQuiz.onclick = () => {
+      menu.style.display = 'none';
+      quizSection.style.display = 'block';
+      startQuiz();
+    }
+    btnBackTerminal.onclick = () => {
+      terminalSection.style.display = 'none';
+      menu.style.display = 'block';
+      clearTerminal();
+    }
+    btnBackQuiz.onclick = () => {
+      quizSection.style.display = 'none';
+      menu.style.display = 'block';
+      clearQuiz();
+    }
+
+    // Terminal code
+    let historicoComandos = [];
+    let erroAleatorio = [false, true, false, false];
+    let diretorioAtual = "C:\\Usuário\\Iago";
+    const terminalOutput = document.getElementById("terminalOutput");
+    const cmdInput = document.getElementById("cmdInput");
+
+    function simularComando() {
+      const entrada = cmdInput.value.trim();
+      let resposta = "";
+
+      if (!entrada) return;
+
+      historicoComandos.push(entrada);
+
+      if (/^ping\s+\d{1,3}(\.\d{1,3}){3}$/.test(entrada)) {
+        const ip = entrada.split(" ")[1];
+        const erro = erroAleatorio[Math.floor(Math.random() * erroAleatorio.length)];
+        if (erro || ip === "192.168.1.99") {
+          resposta = `Esgotado o tempo limite do pedido.\nEsgotado o tempo limite do pedido.`;
+        } else {
+          const tempo1 = Math.floor(Math.random() * 30) + 10;
+          const tempo2 = Math.floor(Math.random() * 30) + 10;
+          resposta = `Pinging ${ip} with 32 bytes of data:\nResposta de ${ip}: bytes=32 tempo=${tempo1}ms TTL=117\nResposta de ${ip}: bytes=32 tempo=${tempo2}ms TTL=117`;
+        }
+      } else if (entrada === "ipconfig") {
+        resposta = `Adaptador de Rede:\nIPv4: 192.168.0.101\nMáscara de Sub-rede: 255.255.255.0\nGateway Padrão: 192.168.0.1`;
+      } else if (entrada === "ipconfig /all") {
+        resposta = `Nome do host: IAGO-PC\nDescrição: Adaptador Ethernet\nEndereço físico: 00-14-22-01-23-45\nDHCP ativado: Sim\nEndereço IPv4: 192.168.0.101\nMáscara de sub-rede: 255.255.255.0\nGateway padrão: 192.168.0.1\nServidor DNS: 8.8.8.8`;
+      } else if (entrada === "tracert google.com") {
+        resposta = `Rastreando a rota para google.com\n1   <1 ms   <1 ms   192.168.0.1\n2    20 ms   21 ms   200.200.1.1\n3    35 ms   32 ms   google.com [142.250.78.14]`;
+      } else if (entrada === "nslookup google.com") {
+        resposta = `Servidor:  resolver1.opendns.com\nEndereço:  208.67.222.222\nResposta não autoritativa:\nNome:    google.com\nEndereço:  142.250.78.14`;
+      } else if (entrada === "netstat") {
+        resposta = `Ativo Conexões:\n  Proto  Endereço local        Endereço remoto      Estado\n  TCP    192.168.0.101:50345   142.250.78.14:443    ESTABELECIDO`;
+      } else if (entrada === "cls") {
+        terminalOutput.innerHTML = "";
+        cmdInput.value = "";
+        return;
+      } else if (entrada === "help") {
+        resposta = `Comandos disponíveis:\nping [IP] - Testa conectividade\nipconfig / ipconfig /all - Mostra configurações de rede\ntracert [host] - Rastreia rota\nnslookup [host] - Consulta DNS\nnetstat - Exibe conexões\ndir - Lista arquivos (fictícios)\ncd [pasta] - Muda diretório\nexit - Fecha terminal\nhistorico - Lista comandos usados\ncls - Limpa terminal\nhelp - Lista de comandos`;
+      } else if (entrada === "historico") {
+        resposta = historicoComandos.map((cmd, i) => `${i + 1}: ${cmd}`).join("\n");
+      } else if (entrada === "dir") {
+        resposta = `Volume em unidade C é IAGO-PC\nPasta de ${diretorioAtual}\n\nArquivos fictícios:\n05/07/2025  10:00    <DIR>          Projetos\n05/07/2025  10:01               0   log.txt\n05/07/2025  10:02               0   resultado.txt`;
+      } else if (entrada.startsWith("cd ")) {
+        const pasta = entrada.split(" ")[1];
+        diretorioAtual += `\\${pasta}`;
+        resposta = "";
+      } else if (entrada === "exit") {
+        resposta = `Terminal encerrado. Obrigado!`;
+        cmdInput.disabled = true;
+      } else {
+        resposta = `'${entrada}' não é reconhecido como um comando interno ou externo.`;
+      }
+
+      terminalOutput.innerHTML += `<div><span>${diretorioAtual}&gt;</span> ${entrada}<br>${resposta.replace(/\n/g, '<br>')}</div>`;
+      cmdInput.value = "";
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    cmdInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") simularComando();
+      if (e.key === "ArrowUp") {
+        this.value = historicoComandos[historicoComandos.length - 1] || "";
+        e.preventDefault();
+      }
+    });
+
+    function clearTerminal() {
+      terminalOutput.innerHTML = "";
+      cmdInput.value = "";
+      cmdInput.disabled = false;
+      diretorioAtual = "C:\\Usuário\\Iago";
+      historicoComandos = [];
+    }
+
+    // Quiz logic
+    const quizQuestions = [
+      {
+        question: "Qual comando é usado para testar a conectividade de rede?",
+        options: ["ipconfig", "ping", "netstat", "tracert"],
+        answer: 1
+      },
+      {
+        question: "O que o comando 'ipconfig /all' exibe?",
+        options: ["Configurações detalhadas do adaptador de rede", "Histórico de conexões TCP", "Rota até um host", "Limpa a tela do terminal"],
+        answer: 0
+      },
+      {
+        question: "Qual comando mostra as conexões de rede ativas?",
+        options: ["netstat", "nslookup", "dir", "cd"],
+        answer: 0
+      },
+      {
+        question: "Qual a função do comando 'tracert'?",
+        options: ["Rastrear a rota de pacotes até um host", "Alterar diretórios", "Listar arquivos", "Testar DNS"],
+        answer: 0
+      },
+      {
+        question: "O que significa o comando 'nslookup'?",
+        options: ["Consulta DNS", "Lista arquivos", "Muda diretórios", "Mostra IP da máquina"],
+        answer: 0
+      }
+    ];
+
+    let currentQuestionIndex = 0;
+
+    const quizQuestionDiv = document.getElementById("quizQuestion");
+    const quizOptionsForm = document.getElementById("quizOptions");
+    const btnSubmitAnswer = document.getElementById("btnSubmitAnswer");
+    const btnNextQuestion = document.getElementById("btnNextQuestion");
+    const quizResultDiv = document.getElementById("quizResult");
+
+    function startQuiz() {
+      currentQuestionIndex = 0;
+      quizResultDiv.textContent = "";
+      btnSubmitAnswer.style.display = "inline-block";
+      btnNextQuestion.style.display = "none";
+      btnSubmitAnswer.disabled = true;
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      const q = quizQuestions[currentQuestionIndex];
+      quizQuestionDiv.textContent = `Pergunta ${currentQuestionIndex + 1}: ${q.question}`;
+      quizOptionsForm.innerHTML = "";
+      q.options.forEach((opt, i) => {
+        const optionId = `opt${i}`;
+        const label = document.createElement("label");
+        label.htmlFor = optionId;
+        label.textContent = opt;
+
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "option";
+        input.id = optionId;
+        input.value = i;
+
+        input.onchange = () => {
+          btnSubmitAnswer.disabled = false;
+        };
+
+        label.prepend(input);
+        quizOptionsForm.appendChild(label);
+      });
+      quizResultDiv.textContent = "";
+      btnSubmitAnswer.disabled = true;
+      btnNextQuestion.style.display = "none";
+    }
+
+    btnSubmitAnswer.onclick = function(e) {
+      e.preventDefault();
+      const selected = quizOptionsForm.option.value;
+      const q = quizQuestions[currentQuestionIndex];
+      if (parseInt(selected) === q.answer) {
+        quizResultDiv.textContent = "✔️ Resposta correta!";
+      } else {
+        quizResultDiv.textContent = `❌ Resposta incorreta. A resposta correta é: "${q.options[q.answer]}"`;
+      }
+      btnSubmitAnswer.style.display = "none";
+      btnNextQuestion.style.display = "inline-block";
+    };
+
+    btnNextQuestion.onclick = function(e) {
+      e.preventDefault();
+      currentQuestionIndex++;
+      if (currentQuestionIndex >= quizQuestions.length) {
+        quizQuestionDiv.textContent = "🎉 Quiz finalizado! Obrigado por participar.";
+        quizOptionsForm.innerHTML = "";
+        btnNextQuestion.style.display = "none";
+        quizResultDiv.textContent = "";
+      } else {
+        loadQuestion();
+        btnSubmitAnswer.style.display = "inline-block";
+      }
+    };
+
+    function clearQuiz() {
+      quizQuestionDiv.textContent = "";
+      quizOptionsForm.innerHTML = "";
+      quizResultDiv.textContent = "";
+      btnSubmitAnswer.disabled = true;
+      btnSubmitAnswer.style.display = "inline-block";
+      btnNextQuestion.style.display = "none";
+    }
+  </script>
+
+</body>
+</html>
