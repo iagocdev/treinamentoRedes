@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>Treinamento Interativo</title>
+  <title>Treinamento Interativo - Terminal Avançado</title>
   <style>
     body {
       background-color: black;
@@ -77,6 +77,21 @@
     #quizControls {
       margin-top: 20px;
     }
+    #progressBar {
+      width: 100%;
+      background-color: #003300;
+      border: 1px solid #00ff00;
+      height: 20px;
+      margin-top: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    #progressBarFill {
+      height: 100%;
+      background-color: #00ff00;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
   </style>
 </head>
 <body>
@@ -92,16 +107,23 @@
     <div id="terminalHelp">
       <strong>Como usar o Terminal Interativo:</strong><br>
       - Teste a conectividade com: <code>ping 8.8.8.8</code><br>
-      - Veja configurações básicas: <code>ipconfig</code><br>
-      - Veja configurações completas: <code>ipconfig /all</code><br>
-      - Rastreie rota até um host: <code>tracert google.com</code><br>
+      - Teste ping contínuo: <code>ping 8.8.8.8 -t</code> (interrompa com <code>Ctrl+C</code>)<br>
+      - Libere IP: <code>ipconfig /release</code><br>
+      - Renove IP: <code>ipconfig /renew</code><br>
+      - Rastreie rota: <code>tracert google.com</code><br>
+      - Diagnóstico detalhado: <code>pathping google.com</code><br>
       - Consulte DNS: <code>nslookup google.com</code><br>
-      - Veja conexões ativas: <code>netstat</code><br>
+      - Exiba conexões: <code>netstat</code>, <code>netstat -an</code><br>
+      - Reset TCP/IP: <code>netsh interface ip reset</code><br>
+      - Liste processos: <code>tasklist</code><br>
+      - Veja ARP: <code>arp -a</code><br>
+      - Perfis WiFi: <code>netsh wlan show profiles</code><br>
+      - Teste conexão telnet: <code>telnet 192.168.0.1 23</code><br>
       - Limpe a tela: <code>cls</code><br>
       - Veja ajuda: <code>help</code>
     </div>
     <div id="terminalOutput"></div>
-    <input type="text" id="cmdInput" autofocus autocomplete="off" />
+    <input type="text" id="cmdInput" autofocus autocomplete="off" spellcheck="false" />
   </div>
 
   <div id="quizSection">
@@ -111,8 +133,12 @@
     <div id="quizControls">
       <button id="btnSubmitAnswer" disabled>Responder</button>
       <button id="btnNextQuestion" style="display:none;">Próxima</button>
+      <button id="btnRestartQuiz" style="display:none;">Reiniciar Quiz</button>
     </div>
-    <div id="quizResult" style="margin-top:20px;"></div>
+    <div id="progressBar">
+      <div id="progressBarFill"></div>
+    </div>
+    <div id="quizResult" style="margin-top:20px; font-weight: bold;"></div>
   </div>
 
   <script>
@@ -129,7 +155,8 @@
     btnTerminal.onclick = () => {
       menu.style.display = 'none';
       terminalSection.style.display = 'block';
-      document.getElementById('cmdInput').focus();
+      cmdInput.focus();
+      if (!terminalStarted) startTerminalWelcome();
     }
     btnQuiz.onclick = () => {
       menu.style.display = 'none';
@@ -140,6 +167,7 @@
       terminalSection.style.display = 'none';
       menu.style.display = 'block';
       clearTerminal();
+      stopPingContinuous();
     }
     btnBackQuiz.onclick = () => {
       quizSection.style.display = 'none';
@@ -147,193 +175,494 @@
       clearQuiz();
     }
 
-    // Terminal code
+    // Terminal variables
     let historicoComandos = [];
-    let erroAleatorio = [false, true, false, false];
-    let diretorioAtual = "C:\\Usuário\\Iago";
+    let historicoIndex = -1;
+    let diretorioAtual = ["C:", "Usuário", "Iago"];
+    let terminalStarted = false;
+
     const terminalOutput = document.getElementById("terminalOutput");
     const cmdInput = document.getElementById("cmdInput");
 
-    function simularComando() {
-      const entrada = cmdInput.value.trim();
-      let resposta = "";
+    // Ping contínuo state
+    let pingContinuous = false;
+    let pingContinuousInterval = null;
+    let pingContinuousIP = null;
 
-      if (!entrada) return;
+    // Função para montar diretório atual como string
+    function diretorioStr() {
+      return diretorioAtual.join("\\");
+    }
 
-      historicoComandos.push(entrada);
-
-      if (/^ping\s+\d{1,3}(\.\d{1,3}){3}$/.test(entrada)) {
-        const ip = entrada.split(" ")[1];
-        const erro = erroAleatorio[Math.floor(Math.random() * erroAleatorio.length)];
-        if (erro || ip === "192.168.1.99") {
-          resposta = `Esgotado o tempo limite do pedido.\nEsgotado o tempo limite do pedido.`;
-        } else {
-          const tempo1 = Math.floor(Math.random() * 30) + 10;
-          const tempo2 = Math.floor(Math.random() * 30) + 10;
-          resposta = `Pinging ${ip} with 32 bytes of data:\nResposta de ${ip}: bytes=32 tempo=${tempo1}ms TTL=117\nResposta de ${ip}: bytes=32 tempo=${tempo2}ms TTL=117`;
-        }
-      } else if (entrada === "ipconfig") {
-        resposta = `Adaptador de Rede:\nIPv4: 192.168.0.101\nMáscara de Sub-rede: 255.255.255.0\nGateway Padrão: 192.168.0.1`;
-      } else if (entrada === "ipconfig /all") {
-        resposta = `Nome do host: IAGO-PC\nDescrição: Adaptador Ethernet\nEndereço físico: 00-14-22-01-23-45\nDHCP ativado: Sim\nEndereço IPv4: 192.168.0.101\nMáscara de sub-rede: 255.255.255.0\nGateway padrão: 192.168.0.1\nServidor DNS: 8.8.8.8`;
-      } else if (entrada === "tracert google.com") {
-        resposta = `Rastreando a rota para google.com\n1   <1 ms   <1 ms   192.168.0.1\n2    20 ms   21 ms   200.200.1.1\n3    35 ms   32 ms   google.com [142.250.78.14]`;
-      } else if (entrada === "nslookup google.com") {
-        resposta = `Servidor:  resolver1.opendns.com\nEndereço:  208.67.222.222\nResposta não autoritativa:\nNome:    google.com\nEndereço:  142.250.78.14`;
-      } else if (entrada === "netstat") {
-        resposta = `Ativo Conexões:\n  Proto  Endereço local        Endereço remoto      Estado\n  TCP    192.168.0.101:50345   142.250.78.14:443    ESTABELECIDO`;
-      } else if (entrada === "cls") {
-        terminalOutput.innerHTML = "";
-        cmdInput.value = "";
-        return;
-      } else if (entrada === "help") {
-        resposta = `Comandos disponíveis:\nping [IP] - Testa conectividade\nipconfig / ipconfig /all - Mostra configurações de rede\ntracert [host] - Rastreia rota\nnslookup [host] - Consulta DNS\nnetstat - Exibe conexões\ndir - Lista arquivos (fictícios)\ncd [pasta] - Muda diretório\nexit - Fecha terminal\nhistorico - Lista comandos usados\ncls - Limpa terminal\nhelp - Lista de comandos`;
-      } else if (entrada === "historico") {
-        resposta = historicoComandos.map((cmd, i) => `${i + 1}: ${cmd}`).join("\n");
-      } else if (entrada === "dir") {
-        resposta = `Volume em unidade C é IAGO-PC\nPasta de ${diretorioAtual}\n\nArquivos fictícios:\n05/07/2025  10:00    <DIR>          Projetos\n05/07/2025  10:01               0   log.txt\n05/07/2025  10:02               0   resultado.txt`;
-      } else if (entrada.startsWith("cd ")) {
-        const pasta = entrada.split(" ")[1];
-        diretorioAtual += `\\${pasta}`;
-        resposta = "";
-      } else if (entrada === "exit") {
-        resposta = `Terminal encerrado. Obrigado!`;
-        cmdInput.disabled = true;
-      } else {
-        resposta = `'${entrada}' não é reconhecido como um comando interno ou externo.`;
-      }
-
-      terminalOutput.innerHTML += `<div><span>${diretorioAtual}&gt;</span> ${entrada}<br>${resposta.replace(/\n/g, '<br>')}</div>`;
-      cmdInput.value = "";
+    function appendOutput(text, isCommand = false) {
+      const prefix = isCommand ? `<span>${diretorioStr()}&gt;</span> ` : "";
+      terminalOutput.innerHTML += `<div>${prefix}${text.replace(/\n/g, '<br>')}</div>`;
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
-    cmdInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") simularComando();
-      if (e.key === "ArrowUp") {
-        this.value = historicoComandos[historicoComandos.length - 1] || "";
+    function stopPingContinuous() {
+      if (pingContinuous) {
+        clearInterval(pingContinuousInterval);
+        pingContinuous = false;
+        appendOutput("^C");
+        appendOutput("Ping interrompido.");
+        cmdInput.disabled = false;
+      }
+    }
+
+    function processDelay(text, delay, callback) {
+      appendOutput("Processando...");
+      setTimeout(() => {
+        // Remove a ultima linha "Processando..."
+        terminalOutput.innerHTML = terminalOutput.innerHTML.replace(/<div>Processando\.\.\.<\/div>$/, '');
+        appendOutput(text);
+        if (callback) callback();
+      }, delay);
+    }
+
+    function startTerminalWelcome() {
+      terminalStarted = true;
+      appendOutput("Bem-vindo ao Terminal de Treinamento!");
+      appendOutput("Digite 'help' para listar os comandos disponíveis.");
+      appendOutput("");
+    }
+
+    function limparTelaAnimada(callback) {
+      let lines = terminalOutput.childNodes.length;
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i >= lines) {
+          clearInterval(interval);
+          terminalOutput.innerHTML = "";
+          if (callback) callback();
+          return;
+        }
+        terminalOutput.removeChild(terminalOutput.firstChild);
+        i++;
+      }, 10);
+    }
+
+    function simularComando() {
+      const entradaOriginal = cmdInput.value.trim();
+      if (!entradaOriginal) return;
+      let entrada = entradaOriginal.toLowerCase();
+
+      if (pingContinuous) {
+        if (entradaOriginal.toLowerCase() === "ctrl+c" || entradaOriginal === "^C") {
+          stopPingContinuous();
+          cmdInput.value = "";
+          return;
+        } else {
+          appendOutput("Comando não permitido durante ping contínuo. Digite Ctrl+C para parar.");
+          cmdInput.value = "";
+          return;
+        }
+      }
+
+      appendOutput(`${entradaOriginal}`, true);
+      historicoComandos.push(entradaOriginal);
+      historicoIndex = historicoComandos.length;
+      cmdInput.value = "";
+
+      // Comandos e lógicas
+
+      // ping -t
+      const pingContRegex = /^ping\s+(\d{1,3}(\.\d{1,3}){3})\s+-t$/;
+      if (pingContRegex.test(entrada)) {
+        if (pingContinuous) {
+          appendOutput("Ping contínuo já em execução.");
+          return;
+        }
+        const ip = entrada.match(pingContRegex)[1];
+        pingContinuous = true;
+        pingContinuousIP = ip;
+        appendOutput(`Executando ping contínuo para ${ip}. Para interromper, digite Ctrl+C.`);
+        cmdInput.disabled = true;
+
+        let count = 0;
+        pingContinuousInterval = setInterval(() => {
+          count++;
+          if (Math.random() < 0.1) {
+            appendOutput(`Esgotado o tempo limite do pedido.`);
+          } else {
+            const tempo = Math.floor(Math.random() * 30) + 10;
+            appendOutput(`Resposta de ${ip}: bytes=32 tempo=${tempo}ms TTL=117`);
+          }
+          if (count >= 1000) {
+            stopPingContinuous();
+          }
+        }, 1000);
+        return;
+      }
+
+      // ping simples
+      const pingRegex = /^ping\s+(\d{1,3}(\.\d{1,3}){3})$/;
+      if (pingRegex.test(entrada)) {
+        const ip = entrada.match(pingRegex)[1];
+        if (ip === "192.168.1.99") {
+          processDelay(`Esgotado o tempo limite do pedido.\nEsgotado o tempo limite do pedido.`, 1000);
+        } else {
+          const tempo1 = Math.floor(Math.random() * 30) + 10;
+          const tempo2 = Math.floor(Math.random() * 30) + 10;
+          processDelay(`Pinging ${ip} with 32 bytes of data:\nResposta de ${ip}: bytes=32 tempo=${tempo1}ms TTL=117\nResposta de ${ip}: bytes=32 tempo=${tempo2}ms TTL=117`, 1000);
+        }
+        return;
+      }
+
+      // ipconfig /release
+      if (entrada === "ipconfig /release") {
+        processDelay("Liberando o endereço IP da interface...\nAdaptador de Rede:\nEndereço IPv4 liberado.\nSucesso.", 1200);
+        return;
+      }
+
+      // ipconfig /renew
+      if (entrada === "ipconfig /renew") {
+        processDelay("Renovando o endereço IP da interface...\nAdaptador de Rede:\nEndereço IPv4 renovado para 192.168.0.101.\nSucesso.", 1200);
+        return;
+      }
+
+      // pathping [host]
+      const pathpingRegex = /^pathping\s+([\w\.]+)$/;
+      if (pathpingRegex.test(entrada)) {
+        const host = entrada.match(pathpingRegex)[1];
+        processDelay(`Rastreando rota e avaliando perda de pacotes para ${host} ...`, 800, () => {
+          appendOutput(`\n1   <1 ms   <1 ms   192.168.0.1  (0% perda)\n2    20 ms   21 ms   200.200.1.1  (5% perda)\n3    35 ms   32 ms   ${host} [142.250.78.14]  (0% perda)`);
+        });
+        return;
+      }
+
+      // netsh interface ip reset
+      if (entrada === "netsh interface ip reset") {
+        processDelay("Reiniciando configurações TCP/IP...\nReset bem-sucedido. Por favor, reinicie o computador para aplicar as alterações.", 1500);
+        return;
+      }
+
+      // netstat -an
+      if (entrada === "netstat -an") {
+        processDelay(`Protocolos Ativos e Portas:\nTCP    0.0.0.0:80         ESCUTANDO\nTCP    192.168.0.101:50345  ESTABELECIDO\nUDP    0.0.0.0:5353        ESCUTANDO`, 800);
+        return;
+      }
+
+      // tasklist
+      if (entrada === "tasklist") {
+        processDelay(`Lista de processos:\nchrome.exe    PID: 1234    Memória: 150MB\nsvchost.exe  PID: 5678    Memória: 30MB\nexplorer.exe PID: 9101    Memória: 50MB`, 800);
+        return;
+      }
+
+      // telnet [ip] [porta]
+      const telnetRegex = /^telnet\s+(\d{1,3}(\.\d{1,3}){3})\s+(\d{1,5})$/;
+      if (telnetRegex.test(entrada)) {
+        const ip = entrada.match(telnetRegex)[1];
+        const port = entrada.match(telnetRegex)[3];
+        processDelay(`Tentando conectar a ${ip} na porta ${port}...`, 1000, () => {
+          if (port === "23") {
+            appendOutput(`Conexão estabelecida com ${ip} na porta ${port}.`);
+          } else {
+            appendOutput(`Falha na conexão: porta ${port} inacessível.`);
+          }
+        });
+        return;
+      }
+
+      // arp -a
+      if (entrada === "arp -a") {
+        processDelay(`Interface: 192.168.0.101 --- 0x3\nEndereço IP          Endereço físico      Tipo\n192.168.0.1         00-14-22-01-23-45     Dinâmico\n192.168.0.101       00-14-22-01-23-46     Dinâmico`, 800);
+        return;
+      }
+
+      // netsh wlan show profiles
+      if (entrada === "netsh wlan show profiles") {
+        processDelay(`Perfis de Usuário de Interface:\nPerfil de Grupo Todos os Usuários\nPerfil de Usuário:\n    Nome do Perfil: RedeCasa\n    Nome do Perfil: MamtechWifi`, 800);
+        return;
+      }
+
+      // ipconfig
+      if (entrada === "ipconfig") {
+        processDelay(`Adaptador de Rede:\nIPv4: 192.168.0.101\nMáscara de Sub-rede: 255.255.255.0\nGateway Padrão: 192.168.0.1`, 800);
+        return;
+      }
+
+      // ipconfig /all
+      if (entrada === "ipconfig /all") {
+        processDelay(`Nome do host: IAGO-PC\nDescrição: Adaptador Ethernet\nEndereço físico: 00-14-22-01-23-45\nDHCP ativado: Sim\nEndereço IPv4: 192.168.0.101\nMáscara de sub-rede: 255.255.255.0\nGateway padrão: 192.168.0.1\nServidor DNS: 8.8.8.8`, 1000);
+        return;
+      }
+
+      // tracert google.com
+      if (entrada === "tracert google.com") {
+        processDelay(`Rastreando a rota para google.com\n1   <1 ms   <1 ms   192.168.0.1\n2    20 ms   21 ms   200.200.1.1\n3    35 ms   32 ms   google.com [142.250.78.14]`, 1000);
+        return;
+      }
+
+      // nslookup google.com
+      if (entrada === "nslookup google.com") {
+        processDelay(`Servidor:  resolver1.opendns.com\nEndereço:  208.67.222.222\nResposta não autoritativa:\nNome:    google.com\nEndereço:  142.250.78.14`, 1000);
+        return;
+      }
+
+      // cls
+      if (entrada === "cls") {
+        limparTelaAnimada();
+        return;
+      }
+
+      // help
+      if (entrada === "help") {
+        appendOutput(`Comandos disponíveis:\n`+
+          `ping [IP] - Testa conectividade\n`+
+          `ping [IP] -t - Ping contínuo\n`+
+          `ipconfig / ipconfig /all /release /renew - Configuração IP\n`+
+          `tracert [host] - Rastreia rota\n`+
+          `pathping [host] - Diagnóstico detalhado\n`+
+          `nslookup [host] - Consulta DNS\n`+
+          `netstat / netstat -an / -a / -r - Conexões e roteamento\n`+
+          `netsh interface ip reset - Reseta TCP/IP\n`+
+          `tasklist - Processos ativos\n`+
+          `telnet [IP] [porta] - Testa conexão em porta TCP\n`+
+          `arp -a - Tabela ARP\n`+
+          `netsh wlan show profiles - Perfis WiFi\n`+
+          `cls - Limpa a tela\n`+
+          `exit - Fecha terminal\n`+
+          `help - Esta ajuda\n`+
+          `historico - Comandos usados`);
+        return;
+      }
+
+      // historico
+      if (entrada === "historico") {
+        if (historicoComandos.length === 0) {
+          appendOutput("Nenhum comando executado ainda.");
+        } else {
+          appendOutput(historicoComandos.map((cmd,i) => `${i+1}: ${cmd}`).join("\n"));
+        }
+        return;
+      }
+
+      // dir
+      if (entrada === "dir") {
+        appendOutput(`Volume em unidade C é IAGO-PC\nPasta de ${diretorioStr()}\n\nArquivos fictícios:\n05/07/2025  10:00    <DIR>          Projetos\n05/07/2025  10:01               0   log.txt\n05/07/2025  10:02               0   resultado.txt`);
+        return;
+      }
+
+      // cd
+      if (entrada.startsWith("cd ")) {
+        const pasta = entradaOriginal.substr(3).trim();
+        if (pasta === "..") {
+          if (diretorioAtual.length > 1) {
+            diretorioAtual.pop();
+          }
+          appendOutput("");
+          return;
+        }
+        if (/^[\w-]+$/.test(pasta)) {
+          diretorioAtual.push(pasta);
+          appendOutput("");
+          return;
+        }
+        appendOutput(`O sistema não reconhece o caminho especificado: ${pasta}`);
+        return;
+      }
+
+      // exit
+      if (entrada === "exit") {
+        appendOutput("Terminal encerrado. Obrigado!");
+        cmdInput.disabled = true;
+        return;
+      }
+
+      // default unknown
+      appendOutput(`'${entradaOriginal}' não é reconhecido como um comando interno ou externo.`);
+    }
+
+    cmdInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        simularComando();
+      } else if (e.key === "ArrowUp") {
+        if (historicoComandos.length > 0) {
+          if (historicoIndex > 0) historicoIndex--;
+          cmdInput.value = historicoComandos[historicoIndex] || "";
+        }
         e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        if (historicoComandos.length > 0) {
+          if (historicoIndex < historicoComandos.length - 1) historicoIndex++;
+          else historicoIndex = historicoComandos.length;
+          cmdInput.value = historicoComandos[historicoIndex] || "";
+        }
+        e.preventDefault();
+      }
+      // Ctrl+C simulação no prompt
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        if (pingContinuous) {
+          stopPingContinuous();
+          cmdInput.value = "";
+          e.preventDefault();
+        }
       }
     });
 
     function clearTerminal() {
       terminalOutput.innerHTML = "";
-      cmdInput.value = "";
       cmdInput.disabled = false;
-      diretorioAtual = "C:\\Usuário\\Iago";
+      pingContinuous = false;
+      pingContinuousIP = null;
+      if (pingContinuousInterval) {
+        clearInterval(pingContinuousInterval);
+        pingContinuousInterval = null;
+      }
       historicoComandos = [];
+      historicoIndex = -1;
+      diretorioAtual = ["C:", "Usuário", "Iago"];
     }
 
-    // Quiz logic
-    const quizQuestions = [
-      {
-        question: "Qual comando é usado para testar a conectividade de rede?",
-        options: ["ipconfig", "ping", "netstat", "tracert"],
-        answer: 1
-      },
-      {
-        question: "O que o comando 'ipconfig /all' exibe?",
-        options: ["Configurações detalhadas do adaptador de rede", "Histórico de conexões TCP", "Rota até um host", "Limpa a tela do terminal"],
-        answer: 0
-      },
-      {
-        question: "Qual comando mostra as conexões de rede ativas?",
-        options: ["netstat", "nslookup", "dir", "cd"],
-        answer: 0
-      },
-      {
-        question: "Qual a função do comando 'tracert'?",
-        options: ["Rastrear a rota de pacotes até um host", "Alterar diretórios", "Listar arquivos", "Testar DNS"],
-        answer: 0
-      },
-      {
-        question: "O que significa o comando 'nslookup'?",
-        options: ["Consulta DNS", "Lista arquivos", "Muda diretórios", "Mostra IP da máquina"],
-        answer: 0
-      }
-    ];
+    // =================== Quiz =======================
 
-    let currentQuestionIndex = 0;
-
-    const quizQuestionDiv = document.getElementById("quizQuestion");
-    const quizOptionsForm = document.getElementById("quizOptions");
+    const quizQuestion = document.getElementById("quizQuestion");
+    const quizOptions = document.getElementById("quizOptions");
     const btnSubmitAnswer = document.getElementById("btnSubmitAnswer");
     const btnNextQuestion = document.getElementById("btnNextQuestion");
-    const quizResultDiv = document.getElementById("quizResult");
+    const btnRestartQuiz = document.getElementById("btnRestartQuiz");
+    const quizResult = document.getElementById("quizResult");
+    const progressBarFill = document.getElementById("progressBarFill");
+
+    const quizData = [
+      {
+        question: "Qual comando libera o endereço IP atual da interface de rede?",
+        options: ["ipconfig /release", "ipconfig /renew", "netsh interface ip reset", "ping 8.8.8.8"],
+        answer: 0,
+        explanation: "O comando 'ipconfig /release' libera o endereço IP atual da interface de rede, liberando-o para o servidor DHCP."
+      },
+      {
+        question: "Qual comando permite executar ping contínuo no Windows?",
+        options: ["ping [IP] -t", "ping -continuous", "ping /c", "ping [IP] -loop"],
+        answer: 0,
+        explanation: "No Windows, o parâmetro '-t' no comando ping faz o teste continuar até ser interrompido com Ctrl+C."
+      },
+      {
+        question: "O que o comando 'netsh interface ip reset' faz?",
+        options: ["Reinicia configurações TCP/IP", "Exibe conexões ativas", "Libera IP da interface", "Renova IP via DHCP"],
+        answer: 0,
+        explanation: "Esse comando reseta as configurações TCP/IP para o estado padrão, ajudando a corrigir problemas de rede."
+      },
+      {
+        question: "Para qual porta o comando 'telnet [IP] 23' tenta conectar?",
+        options: ["Telnet padrão", "HTTP", "FTP", "SSH"],
+        answer: 0,
+        explanation: "A porta 23 é a porta padrão do protocolo Telnet para conexões remotas."
+      },
+      {
+        question: "Qual comando exibe a tabela de roteamento IP?",
+        options: ["netstat -r", "ipconfig", "tracert", "netstat -an"],
+        answer: 0,
+        explanation: "O comando 'netstat -r' mostra a tabela de roteamento IP do sistema."
+      },
+      {
+        question: "O que o comando 'arp -a' exibe?",
+        options: ["Tabela ARP mostrando mapeamento IP para MAC", "Tabela de rotas IP", "Configurações de IP", "Lista de conexões TCP"],
+        answer: 0,
+        explanation: "O comando 'arp -a' exibe a tabela ARP, que mapeia endereços IP a endereços MAC locais."
+      },
+      {
+        question: "Qual comando exibe os perfis Wi-Fi salvos no Windows?",
+        options: ["netsh wlan show profiles", "ipconfig /all", "netstat", "tracert"],
+        answer: 0,
+        explanation: "O comando 'netsh wlan show profiles' lista os perfis de redes Wi-Fi armazenados."
+      }
+    ];
+    let currentQuizIndex = 0;
+    let score = 0;
 
     function startQuiz() {
-      currentQuestionIndex = 0;
-      quizResultDiv.textContent = "";
-      btnSubmitAnswer.style.display = "inline-block";
+      currentQuizIndex = 0;
+      score = 0;
+      quizResult.textContent = "";
       btnNextQuestion.style.display = "none";
+      btnRestartQuiz.style.display = "none";
       btnSubmitAnswer.disabled = true;
-      loadQuestion();
+      quizSection.style.display = "block";
+      showQuestion();
+      updateProgressBar();
     }
 
-    function loadQuestion() {
-      const q = quizQuestions[currentQuestionIndex];
-      quizQuestionDiv.textContent = `Pergunta ${currentQuestionIndex + 1}: ${q.question}`;
-      quizOptionsForm.innerHTML = "";
+    function showQuestion() {
+      const q = quizData[currentQuizIndex];
+      quizQuestion.textContent = `Pergunta ${currentQuizIndex + 1} de ${quizData.length}: ${q.question}`;
+      quizOptions.innerHTML = "";
       q.options.forEach((opt, i) => {
-        const optionId = `opt${i}`;
-        const label = document.createElement("label");
-        label.htmlFor = optionId;
-        label.textContent = opt;
-
-        const input = document.createElement("input");
-        input.type = "radio";
-        input.name = "option";
-        input.id = optionId;
-        input.value = i;
-
-        input.onchange = () => {
-          btnSubmitAnswer.disabled = false;
-        };
-
-        label.prepend(input);
-        quizOptionsForm.appendChild(label);
+        const id = `opt${i}`;
+        quizOptions.innerHTML +=
+          `<label for="${id}"><input type="radio" name="answer" id="${id}" value="${i}"> ${opt}</label>`;
       });
-      quizResultDiv.textContent = "";
       btnSubmitAnswer.disabled = true;
       btnNextQuestion.style.display = "none";
+      quizResult.textContent = "";
+
+      quizOptions.querySelectorAll('input[name="answer"]').forEach(input => {
+        input.addEventListener('change', () => {
+          btnSubmitAnswer.disabled = false;
+        });
+      });
     }
 
-    btnSubmitAnswer.onclick = function(e) {
+    btnSubmitAnswer.onclick = (e) => {
       e.preventDefault();
-      const selected = quizOptionsForm.option.value;
-      const q = quizQuestions[currentQuestionIndex];
-      if (parseInt(selected) === q.answer) {
-        quizResultDiv.textContent = "✔️ Resposta correta!";
+      const selected = quizOptions.querySelector('input[name="answer"]:checked');
+      if (!selected) return;
+      const answer = parseInt(selected.value);
+      const correct = quizData[currentQuizIndex].answer;
+      const explanation = quizData[currentQuizIndex].explanation;
+
+      if (answer === correct) {
+        quizResult.style.color = "#00FF00";
+        quizResult.textContent = "✅ Resposta correta! " + explanation;
+        score++;
       } else {
-        quizResultDiv.textContent = `❌ Resposta incorreta. A resposta correta é: "${q.options[q.answer]}"`;
+        quizResult.style.color = "#FF5555";
+        quizResult.textContent = `❌ Resposta errada! A correta é: ${quizData[currentQuizIndex].options[correct]}. ${explanation}`;
       }
       btnSubmitAnswer.style.display = "none";
       btnNextQuestion.style.display = "inline-block";
+      updateProgressBar();
     };
 
-    btnNextQuestion.onclick = function(e) {
+    btnNextQuestion.onclick = (e) => {
       e.preventDefault();
-      currentQuestionIndex++;
-      if (currentQuestionIndex >= quizQuestions.length) {
-        quizQuestionDiv.textContent = "🎉 Quiz finalizado! Obrigado por participar.";
-        quizOptionsForm.innerHTML = "";
+      currentQuizIndex++;
+      if (currentQuizIndex >= quizData.length) {
+        quizQuestion.textContent = `Quiz finalizado! Você acertou ${score} de ${quizData.length} perguntas.`;
+        quizOptions.innerHTML = "";
+        quizResult.textContent = "";
         btnNextQuestion.style.display = "none";
-        quizResultDiv.textContent = "";
+        btnRestartQuiz.style.display = "inline-block";
+        btnSubmitAnswer.style.display = "none";
+        updateProgressBar(100);
       } else {
-        loadQuestion();
         btnSubmitAnswer.style.display = "inline-block";
+        btnSubmitAnswer.disabled = true;
+        showQuestion();
       }
     };
 
+    btnRestartQuiz.onclick = (e) => {
+      e.preventDefault();
+      startQuiz();
+    };
+
     function clearQuiz() {
-      quizQuestionDiv.textContent = "";
-      quizOptionsForm.innerHTML = "";
-      quizResultDiv.textContent = "";
-      btnSubmitAnswer.disabled = true;
+      quizQuestion.textContent = "";
+      quizOptions.innerHTML = "";
+      quizResult.textContent = "";
       btnSubmitAnswer.style.display = "inline-block";
+      btnSubmitAnswer.disabled = true;
       btnNextQuestion.style.display = "none";
+      btnRestartQuiz.style.display = "none";
+      progressBarFill.style.width = "0%";
+    }
+
+    function updateProgressBar() {
+      const percent = ((currentQuizIndex) / quizData.length) * 100;
+      progressBarFill.style.width = percent + "%";
     }
   </script>
-
 </body>
 </html>
